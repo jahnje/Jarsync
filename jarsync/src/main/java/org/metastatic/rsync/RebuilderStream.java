@@ -191,8 +191,7 @@ public class RebuilderStream
       {
         if (basisFile == null)
           throw new IOException("offsets found but no basis file specified");
-        int len = Math.min(delta.getBlockLength(),
-                           (int) (basisFile.length() - ((Offsets) delta).getOldOffset()));
+        int len = Math.min(delta.getBlockLength(),(int) (basisFile.length() - ((Offsets) delta).getOldOffset()));
         if (len < 0)
           return;
         byte[] buf = new byte[len];

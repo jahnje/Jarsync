@@ -92,19 +92,20 @@ public class Rdiff
 
   /** The long options. */
   protected static final LongOpt[] LONGOPTS = new LongOpt[] {
-      new LongOpt("block-size", LongOpt.REQUIRED_ARGUMENT, null, 'b'),
-      new LongOpt("bzip2", LongOpt.OPTIONAL_ARGUMENT, null, 'i'),
-      new LongOpt("help", LongOpt.NO_ARGUMENT, null, 'h'),
-      new LongOpt("input-size", LongOpt.REQUIRED_ARGUMENT, null, 'I'),
-      new LongOpt("gzip", LongOpt.OPTIONAL_ARGUMENT, null, 'z'),
-      new LongOpt("output-size", LongOpt.REQUIRED_ARGUMENT, null, 'O'),
-      new LongOpt("paranoia", LongOpt.NO_ARGUMENT, null, 'P'),
-      new LongOpt("pipe", LongOpt.NO_ARGUMENT, null, 'p'),
-      new LongOpt("statistics", LongOpt.NO_ARGUMENT, null, 's'),
-      new LongOpt("sum-size", LongOpt.REQUIRED_ARGUMENT, null, 'S'),
-      new LongOpt("verbose", LongOpt.NO_ARGUMENT, null, 'v'),
-      new LongOpt("version", LongOpt.NO_ARGUMENT, null, 'V'),
-      new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd') };
+//      new LongOpt("block-size", LongOpt.REQUIRED_ARGUMENT, null, 'b'),
+//      new LongOpt("bzip2", LongOpt.OPTIONAL_ARGUMENT, null, 'i'),
+//      new LongOpt("help", LongOpt.NO_ARGUMENT, null, 'h'),
+//      new LongOpt("input-size", LongOpt.REQUIRED_ARGUMENT, null, 'I'),
+//      new LongOpt("gzip", LongOpt.OPTIONAL_ARGUMENT, null, 'z'),
+//      new LongOpt("output-size", LongOpt.REQUIRED_ARGUMENT, null, 'O'),
+//      new LongOpt("paranoia", LongOpt.NO_ARGUMENT, null, 'P'),
+//      new LongOpt("pipe", LongOpt.NO_ARGUMENT, null, 'p'),
+//      new LongOpt("statistics", LongOpt.NO_ARGUMENT, null, 's'),
+//      new LongOpt("sum-size", LongOpt.REQUIRED_ARGUMENT, null, 'S'),
+//      new LongOpt("verbose", LongOpt.NO_ARGUMENT, null, 'v'),
+//      new LongOpt("version", LongOpt.NO_ARGUMENT, null, 'V'),
+//      new LongOpt("debug", LongOpt.NO_ARGUMENT, null, 'd') 
+      };
 
   public static final int CHUNK_SIZE = 32768;
 
@@ -1004,8 +1005,104 @@ public class Rdiff
     throw new IOException("Didn't recieve RS_OP_END.");
   }
 
-  public void rebuildFile(File basis, InputStream deltas, OutputStream out)
-      throws IOException
+  public void rebuildFile(File basis, InputStream deltas)throws IOException
+  {
+    File temp = File.createTempFile(".rdiff", null);
+    //temp.deleteOnExit();
+    final RandomAccessFile f = new RandomAccessFile(temp, "rw");
+    RebuilderStream rs = new RebuilderStream();
+    rs.setBasisFile(basis);
+    rs.addListener(new RebuilderListener() {
+      public void update(RebuilderEvent re) throws ListenerException
+      {
+        try
+          {
+            f.seek(re.getOffset());
+            f.write(re.getData());
+          } catch (IOException ioe)
+          {
+            throw new ListenerException(ioe);
+          }
+      }
+    });
+
+    int header = readInt(deltas);
+    if (debug)
+      {
+        System.out.printf("[RDIFF] read header %x%n", header);
+      }
+    if (header != DELTA_MAGIC)
+      {
+        throw new IOException("Bad delta header: 0x"
+            + Integer.toHexString(header));
+      }
+
+    int command;
+    long offset = 0;
+    byte[] buf;
+    boolean end = false;
+    read: while ((command = deltas.read()) != -1)
+      {
+        try
+          {
+            switch (command)
+              {
+              case OP_END:
+                end = true;
+                break read;
+              case OP_LITERAL_N1:
+                buf = new byte[(int) readInt(1, deltas)];
+                deltas.read(buf);
+                rs.update(new DataBlock(offset, buf));
+                offset += buf.length;
+                break;
+              case OP_LITERAL_N2:
+                buf = new byte[(int) readInt(2, deltas)];
+                deltas.read(buf);
+                rs.update(new DataBlock(offset, buf));
+                offset += buf.length;
+                break;
+              case OP_LITERAL_N4:
+                buf = new byte[(int) readInt(4, deltas)];
+                deltas.read(buf);
+                rs.update(new DataBlock(offset, buf));
+                offset += buf.length;
+                break;
+              case OP_COPY_N4_N4:
+                int oldOff = (int) readInt(4, deltas);
+                int bs = (int) readInt(4, deltas);
+                rs.update(new Offsets(oldOff, offset, bs));
+                offset += bs;
+                break;
+              default:
+                throw new IOException("Bad delta command: 0x"
+                    + Integer.toHexString(command));
+              }
+          } catch (ListenerException le)
+          {
+            throw (IOException) le.getCause();
+          }
+      }
+    if (!end)
+      throw new IOException("Didn't recieve RS_OP_END.");
+    f.close();
+    FileInputStream fin = new FileInputStream(temp);
+    buf = new byte[CHUNK_SIZE];
+    int len = 0;
+    try(OutputStream out = new FileOutputStream(basis))
+    {
+      while ((len = fin.read(buf)) != -1)      
+        {
+          out.write(buf, 0, len);
+        }
+      out.flush();
+    }
+    temp.delete();
+  }
+  
+  
+  
+  public void rebuildFile(File basis, InputStream deltas, OutputStream out)throws IOException
   {
     File temp = File.createTempFile(".rdiff", null);
     temp.deleteOnExit();

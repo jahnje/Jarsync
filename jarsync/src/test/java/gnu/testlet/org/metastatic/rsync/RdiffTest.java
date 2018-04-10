@@ -19,7 +19,7 @@ public class RdiffTest
 {
   private static final Logger log = Logger.getLogger(RdiffTest.class);
 
-  private File folder = new File("target/test-classes/rdifftest");
+  private File folder = new File("src/test/resources/rdifftest");
 
   @Test
   public void testRdiff() throws NoSuchAlgorithmException,
