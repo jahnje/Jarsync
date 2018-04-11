@@ -68,12 +68,13 @@ import java.io.PrintStream;
 import java.io.RandomAccessFile;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.Security;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.metastatic.HASH_ALGORITHM;
+
+import com.delcyon.stream.MD5FilterOutputStream;
 
 /**
  * A re-implementation of the <code>rdiff</code> utility from librsync. For more
@@ -1005,7 +1006,7 @@ public class Rdiff
     throw new IOException("Didn't recieve RS_OP_END.");
   }
 
-  public void rebuildFile(File basis, InputStream deltas)throws IOException
+  public String rebuildFile(File basis, InputStream deltas)throws IOException, NoSuchAlgorithmException
   {
     File temp = File.createTempFile(".rdiff", null);
     //temp.deleteOnExit();
@@ -1089,15 +1090,18 @@ public class Rdiff
     FileInputStream fin = new FileInputStream(temp);
     buf = new byte[CHUNK_SIZE];
     int len = 0;
-    try(OutputStream out = new FileOutputStream(basis))
+    String md5 = null;
+    try(MD5FilterOutputStream out = new MD5FilterOutputStream( new FileOutputStream(basis)))
     {
       while ((len = fin.read(buf)) != -1)      
         {
           out.write(buf, 0, len);
         }
       out.flush();
+      md5 = out.getMD5(); 
     }
     temp.delete();
+    return md5;
   }
   
   
