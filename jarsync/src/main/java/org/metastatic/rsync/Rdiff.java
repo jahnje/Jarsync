@@ -1070,8 +1070,9 @@ public class Rdiff
                 offset += buf.length;
                 break;
               case OP_COPY_N4_N4:
-                int oldOff = (int) readInt(4, deltas);
+                long oldOff = readInt(4, deltas);
                 int bs = (int) readInt(4, deltas);
+                //System.out.println("oldl="+oldOff+" bs="+bs);
                 rs.update(new Offsets(oldOff, offset, bs));
                 offset += bs;
                 break;
@@ -1360,12 +1361,12 @@ public class Rdiff
   private static long readInt(int len, InputStream in) throws IOException
   {
     long i = 0;
-    for (int j = len - 1; j >= 0; j--)
+    for (long j = (long)len - 1l; j >= 0l; j--)
       {
-        int k = in.read();
-        if (k == -1)
+        long k = (long)in.read();
+        if (k == -1l)
           throw new EOFException();
-        i |= (k & 0xff) << 8 * j;
+        i |= (k & 0xff) << 8l * j;
       }
     return i;
   }
