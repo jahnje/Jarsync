@@ -82,144 +82,147 @@ import java.util.LinkedList;
 public class RebuilderStream
 {
 
-  // Fields.
-  // -----------------------------------------------------------------------
+	// Fields.
+	// -----------------------------------------------------------------------
 
-  /** The basis file. */
-  protected RandomAccessFile basisFile;
+	/** The basis file. */
+	protected RandomAccessFile basisFile;
 
-  /** The list of {@link RebuilderListener}s. */
-  protected final LinkedList<RebuilderListener> listeners;
+	/** The list of {@link RebuilderListener}s. */
+	protected final LinkedList<RebuilderListener> listeners;
 
-  // Constructors.
-  // -----------------------------------------------------------------------
+	// Constructors.
+	// -----------------------------------------------------------------------
 
-  /**
-   * Create a new rebuilder.
-   */
-  public RebuilderStream()
-  {
-    listeners = new LinkedList<RebuilderListener>();
-  }
+	/**
+	 * Create a new rebuilder.
+	 */
+	public RebuilderStream()
+	{
+		listeners = new LinkedList<RebuilderListener>();
+	}
 
-  // Instance methods.
-  // -----------------------------------------------------------------------
+	// Instance methods.
+	// -----------------------------------------------------------------------
 
-  /**
-   * Add a RebuilderListener listener to this rebuilder.
-   *
-   * @param listener The listener to add.
-   * @throws IllegalArgumentException If <i>listener</i> is null.
-   */
-  public void addListener(RebuilderListener listener)
-  {
-    if (listener == null)
-      throw new IllegalArgumentException();
-    listeners.add(listener);
-  }
+	/**
+	 * Add a RebuilderListener listener to this rebuilder.
+	 *
+	 * @param listener The listener to add.
+	 * @throws IllegalArgumentException If <i>listener</i> is null.
+	 */
+	public void addListener(RebuilderListener listener)
+	{
+		if (listener == null)
+			throw new IllegalArgumentException();
+		listeners.add(listener);
+	}
 
-  /**
-   * Remove a listener from this rebuilder.
-   *
-   * @param listener The listener to remove.
-   */
-  public void removeListener(RebuilderListener listener)
-  {
-    listeners.remove(listener);
-  }
+	/**
+	 * Remove a listener from this rebuilder.
+	 *
+	 * @param listener The listener to remove.
+	 */
+	public void removeListener(RebuilderListener listener)
+	{
+		listeners.remove(listener);
+	}
 
-  /**
-   * Set the basis file.
-   *
-   * @param file The basis file.
-   * @throws IOException If the file is not readable.
-   */
-  public void setBasisFile(File file) throws IOException
-  {
-    if (basisFile != null)
-      {
-        basisFile.close();
-        basisFile = null;
-      }
-    if (file != null)
-      basisFile = new RandomAccessFile(file, "r");
-  }
+	/**
+	 * Set the basis file.
+	 *
+	 * @param file The basis file.
+	 * @throws IOException If the file is not readable.
+	 */
+	public void setBasisFile(File file) throws IOException
+	{
+		if (basisFile != null)
+		{
+			basisFile.close();
+			basisFile = null;
+		}
+		if (file != null)
+			basisFile = new RandomAccessFile(file, "r");
+	}
 
-  /**
-   * Set the basis file.
-   *
-   * @param file The basis file name.
-   * @throws IOException If the file name is not the name of a readable file.
-   */
-  public void setBasisFile(String file) throws IOException
-  {
-    if (basisFile != null)
-      {
-        basisFile.close();
-        basisFile = null;
-      }
-    if (file != null)
-      basisFile = new RandomAccessFile(file, "r");
-  }
+	/**
+	 * Set the basis file.
+	 *
+	 * @param file The basis file name.
+	 * @throws IOException If the file name is not the name of a readable file.
+	 */
+	public void setBasisFile(String file) throws IOException
+	{
+		if (basisFile != null)
+		{
+			basisFile.close();
+			basisFile = null;
+		}
+		if (file != null)
+			basisFile = new RandomAccessFile(file, "r");
+	}
 
-  /**
-   *
-   */
-  public void doFinal() throws IOException
-  {
-    if (basisFile != null)
-      basisFile.close();
-  }
+	/**
+	 *
+	 */
+	public void doFinal() throws IOException
+	{
+		if (basisFile != null)
+			basisFile.close();
+	}
 
-  /**
-   * Update this rebuilder with a delta.
-   *
-   * @param delta The delta to apply.
-   * @throws IOException If there is an error reading from the basis
-   *    file, or if no basis file has been specified.
-   */
-  public void update(Delta delta) throws IOException, ListenerException
-  {
-    ListenerException exception = null, current = null;
-    RebuilderEvent e = null;
-    if (delta instanceof DataBlock)
-      {
-        e = new RebuilderEvent(((DataBlock) delta).getData(),
-                               delta.getWriteOffset());
-      }
-    else
-      {
-        if (basisFile == null)
-          throw new IOException("offsets found but no basis file specified");
-        int len = Math.min(delta.getBlockLength(),(int) (basisFile.length() - ((Offsets) delta).getOldOffset()));
-        if (len < 0)
-          return;
-        byte[] buf = new byte[len];
-        basisFile.seek(((Offsets) delta).getOldOffset());
-        len = basisFile.read(buf);
-        e = new RebuilderEvent(buf, 0, len, delta.getWriteOffset());
-      }
-    for (RebuilderListener l : listeners)
-      {
-        try
-          {
-            l.update(e);
-          }
-        catch (ListenerException le)
-          {
-            if (exception != null)
-              {
-                current.setNext(le);
-                current = le;
-              }
-            else
-              {
-                exception = le;
-                current = le;
-              }
-          }
-      }
-    if (exception != null)
-      throw exception;
-  }
+	/**
+	 * Update this rebuilder with a delta.
+	 *
+	 * @param delta The delta to apply.
+	 * @throws IOException If there is an error reading from the basis
+	 *    file, or if no basis file has been specified.
+	 */
+	public void update(Delta delta) throws IOException, ListenerException
+	{
+		ListenerException exception = null, current = null;
+		RebuilderEvent e = null;
+		if (delta instanceof DataBlock)
+		{
+			e = new RebuilderEvent(((DataBlock) delta).getData(),delta.getWriteOffset());
+		}
+		else
+		{
+			if (basisFile == null)
+			{
+				throw new IOException("offsets found but no basis file specified");
+			}
+			int len = Math.min(delta.getBlockLength(),(int) (basisFile.length() - ((Offsets) delta).getOldOffset()));
+			if (len < 0)
+			{
+				return;
+			}
+			byte[] buf = new byte[len];
+			basisFile.seek(((Offsets) delta).getOldOffset());
+			len = basisFile.read(buf);
+			e = new RebuilderEvent(buf, 0, len, delta.getWriteOffset());
+		}
+		for (RebuilderListener l : listeners)
+		{
+			try
+			{
+				l.update(e);
+			}
+			catch (ListenerException le)
+			{
+				if (exception != null)
+				{
+					current.setNext(le);
+					current = le;
+				}
+				else
+				{
+					exception = le;
+					current = le;
+				}
+			}
+		}
+		if (exception != null)
+			throw exception;
+	}
 }
