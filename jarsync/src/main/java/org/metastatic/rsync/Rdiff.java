@@ -155,6 +155,9 @@ public class Rdiff
 	 */
 	protected int blockLength;
 
+	
+	protected int chunkSize;
+	
 	/**
 	 * The effective strong signature length.
 	 */
@@ -169,6 +172,7 @@ public class Rdiff
 	public Rdiff() {
 		blockLength = RDIFF_BLOCK_LENGTH;
 		strongSumLength = RDIFF_STRONG_LENGTH;
+		chunkSize = CHUNK_SIZE;
 	}
 
 	// Main entry point.
@@ -801,7 +805,13 @@ public class Rdiff
 		c.strongSum = MessageDigest.getInstance(HASH_ALGORITHM.DIGEST_NAME);
 		c.weakSum = new Checksum32(CHAR_OFFSET);
 		c.blockLength = blockLength;
+		System.out.println("found a blocklength of "+blockLength);
 		c.strongSumLength = strongSumLength;
+		if(chunkSize < blockLength)
+		{
+		    setChunkSize(blockLength+CHUNK_SIZE);
+		}
+		c.chunkSize = chunkSize;
 		MatcherStream match = new MatcherStream(c);
 		match.setChecksums(sums);
 		writeInt(DELTA_MAGIC, out);
@@ -829,7 +839,7 @@ public class Rdiff
 			}
 		});
 		int len = 0;
-		byte[] buf = new byte[CHUNK_SIZE];
+		byte[] buf = new byte[chunkSize];
 		while ((len = in.read(buf)) != -1)
 		{
 			try
@@ -1086,7 +1096,7 @@ public class Rdiff
 			throw new IOException("Didn't recieve RS_OP_END.");
 		f.close();
 		FileInputStream fin = new FileInputStream(temp);
-		buf = new byte[CHUNK_SIZE];
+		buf = new byte[chunkSize];
 		int len = 0;
 		String md5 = null;
 		try(MD5FilterOutputStream out = new MD5FilterOutputStream( new FileOutputStream(basis)))
@@ -1432,7 +1442,29 @@ public class Rdiff
 
 	public void setBlockLength(int i)
 	{
-		this.blockLength = i;
-		System.out.println("set blocklength to:"+i);
+	    System.out.println("setting blocklength to:"+i);
+	    if(i > chunkSize)
+	    {
+	        i = chunkSize/2;
+	        System.out.println("reduced blocklength to:"+i+" since bigger than CHUNK_SIZE:"+chunkSize);
+	    }
+	    if(i > RDIFF_BLOCK_LENGTH)
+	    {
+	        this.blockLength = i;
+	    }
 	}
+	
+	/**
+     * @param chunkSize the chunkSize to set
+     */
+    public void setChunkSize(int chunkSize)
+    {        
+        if(chunkSize > CHUNK_SIZE)
+        {
+            System.out.println("setting chunkSize to:"+chunkSize);        
+            this.chunkSize = chunkSize;
+        }
+    }
+	
+	
 }
