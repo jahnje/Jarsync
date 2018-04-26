@@ -1018,97 +1018,108 @@ public class Rdiff
 
 	public String rebuildFile(File basis, InputStream deltas)throws IOException, NoSuchAlgorithmException
 	{
+		
+		String md5 = null;
 		File temp = File.createTempFile(".rdiff", null);
-		//temp.deleteOnExit();
-		final RandomAccessFile f = new RandomAccessFile(temp, "rw");
-		RebuilderStream rs = new RebuilderStream();
-		rs.setBasisFile(basis);
-		rs.addListener(new RebuilderListener() {
-			public void update(RebuilderEvent re) throws ListenerException
+
+		try(final RandomAccessFile f = new RandomAccessFile(temp, "rw"))
+		{
+
+			//temp.deleteOnExit();
+			
+			RebuilderStream rs = new RebuilderStream();
+			rs.setBasisFile(basis);
+			rs.addListener(new RebuilderListener() {
+				public void update(RebuilderEvent re) throws ListenerException
+				{
+					try
+					{
+						f.seek(re.getOffset());
+						f.write(re.getData());
+					} catch (IOException ioe)
+					{
+						throw new ListenerException(ioe);
+					}
+				}
+			});
+
+			int header = readInt(deltas);
+			if (debug)
+			{
+				System.out.printf("[RDIFF] read header %x%n", header);
+			}
+			if (header != DELTA_MAGIC)
+			{
+				throw new IOException("Bad delta header: 0x"+ Integer.toHexString(header));
+			}
+
+			int command;
+			long offset = 0;
+			byte[] buf;
+			boolean end = false;
+			read: while ((command = deltas.read()) != -1)
 			{
 				try
 				{
-					f.seek(re.getOffset());
-					f.write(re.getData());
-				} catch (IOException ioe)
+					switch (command)
+					{
+					case OP_END:
+						end = true;
+						break read;
+					case OP_LITERAL_N1:
+						buf = new byte[(int) readInt(1, deltas)];
+						deltas.read(buf);
+						rs.update(new DataBlock(offset, buf));
+						offset += buf.length;
+						break;
+					case OP_LITERAL_N2:
+						buf = new byte[(int) readInt(2, deltas)];
+						deltas.read(buf);
+						rs.update(new DataBlock(offset, buf));
+						offset += buf.length;
+						break;
+					case OP_LITERAL_N4:
+						buf = new byte[(int) readInt(4, deltas)];
+						deltas.read(buf);
+						rs.update(new DataBlock(offset, buf));
+						offset += buf.length;
+						break;
+					case OP_COPY_N4_N4:
+						long oldOff = readInt(4, deltas);
+						int bs = (int) readInt(4, deltas);					
+						rs.update(new Offsets(oldOff, offset, bs));
+						offset += bs;
+						break;
+					default:
+						throw new IOException("Bad delta command: 0x"+ Integer.toHexString(command));
+					}
+				} catch (ListenerException le)
 				{
-					throw new ListenerException(ioe);
+					throw (IOException) le.getCause();
 				}
 			}
-		});
+			if (!end)
+				throw new IOException("Didn't recieve RS_OP_END.");
+		
+			f.close();
+		
+			FileInputStream fin = new FileInputStream(temp);
+			buf = new byte[chunkSize];
+			int len = 0;
 
-		int header = readInt(deltas);
-		if (debug)
-		{
-			System.out.printf("[RDIFF] read header %x%n", header);
-		}
-		if (header != DELTA_MAGIC)
-		{
-			throw new IOException("Bad delta header: 0x"+ Integer.toHexString(header));
-		}
-
-		int command;
-		long offset = 0;
-		byte[] buf;
-		boolean end = false;
-		read: while ((command = deltas.read()) != -1)
-		{
-			try
+			try(MD5FilterOutputStream out = new MD5FilterOutputStream( new FileOutputStream(basis)))
 			{
-				switch (command)
+				while ((len = fin.read(buf)) != -1)      
 				{
-				case OP_END:
-					end = true;
-					break read;
-				case OP_LITERAL_N1:
-					buf = new byte[(int) readInt(1, deltas)];
-					deltas.read(buf);
-					rs.update(new DataBlock(offset, buf));
-					offset += buf.length;
-					break;
-				case OP_LITERAL_N2:
-					buf = new byte[(int) readInt(2, deltas)];
-					deltas.read(buf);
-					rs.update(new DataBlock(offset, buf));
-					offset += buf.length;
-					break;
-				case OP_LITERAL_N4:
-					buf = new byte[(int) readInt(4, deltas)];
-					deltas.read(buf);
-					rs.update(new DataBlock(offset, buf));
-					offset += buf.length;
-					break;
-				case OP_COPY_N4_N4:
-					long oldOff = readInt(4, deltas);
-					int bs = (int) readInt(4, deltas);					
-					rs.update(new Offsets(oldOff, offset, bs));
-					offset += bs;
-					break;
-				default:
-					throw new IOException("Bad delta command: 0x"+ Integer.toHexString(command));
+					out.write(buf, 0, len);
 				}
-			} catch (ListenerException le)
-			{
-				throw (IOException) le.getCause();
+				out.flush();
+				md5 = out.getMD5(); 
 			}
+		
+		} finally {			
+			temp.delete();
 		}
-		if (!end)
-			throw new IOException("Didn't recieve RS_OP_END.");
-		f.close();
-		FileInputStream fin = new FileInputStream(temp);
-		buf = new byte[chunkSize];
-		int len = 0;
-		String md5 = null;
-		try(MD5FilterOutputStream out = new MD5FilterOutputStream( new FileOutputStream(basis)))
-		{
-			while ((len = fin.read(buf)) != -1)      
-			{
-				out.write(buf, 0, len);
-			}
-			out.flush();
-			md5 = out.getMD5(); 
-		}
-		temp.delete();
 		return md5;
 	}
 
