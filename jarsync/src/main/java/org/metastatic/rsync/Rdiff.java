@@ -1022,6 +1022,7 @@ public class Rdiff
 		String md5 = null;
 		File temp = File.createTempFile(".rdiff", null);
 		RebuilderStream rs = new RebuilderStream();
+		DataInputStream dataInputStream = new DataInputStream(deltas);
 		try(final RandomAccessFile f = new RandomAccessFile(temp, "rw"))
 		{
 
@@ -1057,10 +1058,17 @@ public class Rdiff
 			long offset = 0;
 			byte[] buf;
 			boolean end = false;
+			long commandCount = 0l;
 			read: while ((command = deltas.read()) != -1)
 			{
+				commandCount++;
+				
 				try
 				{
+					if(debug && commandCount <= 5l)
+					{
+						System.out.println("delta command: 0x"+ Integer.toHexString(command)+" count# "+commandCount);
+					}
 					switch (command)
 					{
 					case OP_END:
@@ -1068,19 +1076,22 @@ public class Rdiff
 						break read;
 					case OP_LITERAL_N1:
 						buf = new byte[(int) readInt(1, deltas)];
-						deltas.read(buf);
+						dataInputStream.readFully(buf);
+						//blockingRead(buf, deltas);
 						rs.update(new DataBlock(offset, buf));
 						offset += buf.length;
 						break;
 					case OP_LITERAL_N2:
 						buf = new byte[(int) readInt(2, deltas)];
-						deltas.read(buf);
+						//blockingRead(buf, deltas);
+						dataInputStream.readFully(buf);
 						rs.update(new DataBlock(offset, buf));
 						offset += buf.length;
 						break;
 					case OP_LITERAL_N4:
 						buf = new byte[(int) readInt(4, deltas)];
-						deltas.read(buf);
+						//blockingRead(buf, deltas);
+						dataInputStream.readFully(buf);
 						rs.update(new DataBlock(offset, buf));
 						offset += buf.length;
 						break;
@@ -1091,7 +1102,7 @@ public class Rdiff
 						offset += bs;
 						break;
 					default:
-						throw new IOException("Bad delta command: 0x"+ Integer.toHexString(command));
+						throw new IOException("Bad delta command: 0x"+ Integer.toHexString(command)+" count# "+commandCount);
 					}
 				} catch (ListenerException le)
 				{
@@ -1125,6 +1136,24 @@ public class Rdiff
 	}
 
 
+	private void blockingRead(byte[] buf, InputStream deltas) throws IOException
+	{
+		DataInputStream dataInputStream = new DataInputStream(deltas);
+		dataInputStream.readFully(buf);
+//		for(int readCount = 0; readCount < buf.length; readCount++)
+//		{
+//			buf[readCount] = (byte) deltas.read();
+//			if(buf[readCount] == -1)
+//			{				
+//				for(int i = 0; i < 5;i++)
+//				{
+//					System.out.println("next: "+deltas.read());
+//				}
+//				throw new IOException("Couldn't fully read:Ahh!!! read "+readCount+" into buf of size: "+buf.length);
+//			}
+//		}
+	}
+	
 
 	public void rebuildFile(File basis, InputStream deltas, OutputStream out)throws IOException
 	{
@@ -1162,8 +1191,10 @@ public class Rdiff
 		long offset = 0;
 		byte[] buf;
 		boolean end = false;
+		long commandCount = 0l;
 		read: while ((command = deltas.read()) != -1)
 		{
+			commandCount++;
 			try
 			{
 				switch (command)
@@ -1197,7 +1228,7 @@ public class Rdiff
 					break;
 				default:
 					throw new IOException("Bad delta command: 0x"
-							+ Integer.toHexString(command));
+							+ Integer.toHexString(command)+" count# "+commandCount);
 				}
 			} catch (ListenerException le)
 			{
