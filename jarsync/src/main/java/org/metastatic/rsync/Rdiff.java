@@ -1021,13 +1021,13 @@ public class Rdiff
 		
 		String md5 = null;
 		File temp = File.createTempFile(".rdiff", null);
-
+		RebuilderStream rs = new RebuilderStream();
 		try(final RandomAccessFile f = new RandomAccessFile(temp, "rw"))
 		{
 
 			//temp.deleteOnExit();
 			
-			RebuilderStream rs = new RebuilderStream();
+			
 			rs.setBasisFile(basis);
 			rs.addListener(new RebuilderListener() {
 				public void update(RebuilderEvent re) throws ListenerException
@@ -1119,6 +1119,7 @@ public class Rdiff
 		
 		} finally {			
 			temp.delete();
+			rs.doFinal();
 		}
 		return md5;
 	}
