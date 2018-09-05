@@ -538,7 +538,8 @@ public class MatcherStream
 	 */
 	protected Long hashSearch(byte[] block, int off, int len)
 	{
-		Integer weakSum = new Integer(config.weakSum.getValue());
+	    
+		Integer weakSum = Integer.valueOf(config.weakSum.getValue());
 		if (hashtable.containsKey(weakSum.intValue()))
 		{
 			if (config.debug)
